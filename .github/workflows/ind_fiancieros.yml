@@ -1,0 +1,35 @@
+name: Indicadores_financieros
+
+on:
+  push:
+    branches: [ main ]
+    
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout del repo
+        uses: actions/checkout@v4
+      - name: checkout del repo
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.0' 
+      - name: instalacion dependencias
+        run: pip install -r requeriments.txt
+      - name: ejecutar scripts
+        run: python ./src/actividad_4/ejecucion.py
+
+      - name: Commit and push changes
+        uses: actions/checkout@v4
+        with: 
+          commit_user_name: Andres Callejas
+          commit_user_email: andres.callejas@iudigital.edu.co
+          commit_author: andresfkyjas
+          
+          
+
+      
