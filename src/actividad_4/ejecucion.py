@@ -2,7 +2,7 @@
 
 #from modelo import Modelo
 #from scrapper import Scrapper
-from .scrapper_yahoo import Scrapper_yahoo
+from actividad_4.scrapper_yahoo import Scrapper_yahoo
 import pkg_resources
 import time
 import pandas as pd

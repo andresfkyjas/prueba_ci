@@ -22,6 +22,8 @@ jobs:
         run: pip install --upgrade pip
       - name: instalacion dependencias
         run: pip install -r requeriments.txt
+      - name: Instalar el paquete en modo editable
+        run: pip install -e .
       - name: ejecutar scripts
         run: python ./src/actividad_4/ejecucion.py
 
