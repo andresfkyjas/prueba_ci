@@ -24,6 +24,13 @@ jobs:
         run: pip install -r requeriments.txt
       - name: Instalar el paquete en modo editable
         run: pip install -e .
+      - name: Listar archivos y verificar existencia de ejecucion.py
+        run: |
+          ls -R
+          if [ ! -f "src/actividad_4/ejecucion.py" ]; then
+            echo "El archivo src/actividad_4/ejecucion.py no se encontró."
+            exit 1
+          fi
       - name: ejecutar scripts
         run: python src/actividad_4/ejecucion.py
 
