@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{asunto}}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            text-align: center;
+        }
+        .content {
+            background: white;
+            padding: 30px;
+            border: 1px solid #ddd;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 0 0 10px 10px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+        .info-box {
+            background: #f0f8ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        h1 { margin: 0; font-size: 24px; }
+        h2 { color: #667eea; margin-top: 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{asunto}}</h1>
+        <p>Pipeline edu-pad • {{timestamp}}</p>
+    </div>
+    
+    <div class="content">
+        <h2>{{saludo}}</h2>
+        
+        <div class="info-box">
+            {{informacion}}
+        </div>
+        
+        <p>{{cierre}}</p>
+        
+        <p><strong>Saludos,</strong><br>
+        {{nombre}}</p>
+    </div>
+    
+    <div class="footer">
+        <p>Este es un mensaje automático del sistema edu-pad<br>
+        Generado el {{timestamp}}</p>
+    </div>
+</body>
+</html>
