@@ -14,6 +14,7 @@ setup(
         "beautifulsoup4",
         "streamlit",
         "pillow",
-        "altair"
+        "altair",
+        "plotly"
     ]
 )
