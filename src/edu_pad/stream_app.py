@@ -5,7 +5,6 @@ import pandas as pd
 import altair as alt
 import plotly.express as px
 import plotly.graph_objects as go
-#from src.edu_pad.dataweb import DataWeb
 
 #######################
 # Page configuration
@@ -174,39 +173,64 @@ def make_heatmap(input_df, input_y, input_x, input_color):
     return heatmap
 
 def make_world_map(input_df):
-    """Crea un mapa mundial con los indicadores"""
-    fig = go.Figure()
-    
-    # Agregar puntos para cada indicador
-    for indicator in input_df['indicador'].unique():
-        indicator_data = input_df[input_df['indicador'] == indicator].iloc[0]
-        fig.add_trace(go.Scattergeo(
-            lon=[indicator_data['lon']],
-            lat=[indicator_data['lat']],
-            text=[f"{indicator_data['indicator_name']}<br>Valor: {indicator_data['cerrar']:.2f}"],
-            mode='markers',
-            marker=dict(
-                size=15,
-                color=indicator_data['cerrar'],
-                colorscale='Viridis',
-                showscale=True,
-                colorbar=dict(title="Valor de Cierre")
+    """Crea un mapa mundial con los indicadores usando Plotly"""
+    try:
+        # Prepare data for world map
+        map_data = input_df.groupby(['indicador', 'indicator_name', 'country', 'lat', 'lon'])['cerrar'].mean().reset_index()
+        
+        fig = go.Figure()
+        
+        # Add points for each indicator
+        for _, row in map_data.iterrows():
+            fig.add_trace(go.Scattergeo(
+                lon=[row['lon']],
+                lat=[row['lat']],
+                text=f"{row['indicator_name']}<br>País: {row['country']}<br>Valor: {row['cerrar']:.2f}",
+                mode='markers+text',
+                marker=dict(
+                    size=15,
+                    color=row['cerrar'],
+                    colorscale='Viridis',
+                    showscale=True,
+                    colorbar=dict(title="Valor de Cierre"),
+                    line=dict(width=1, color='white')
+                ),
+                name=row['indicator_name'],
+                textposition="top center"
+            ))
+        
+        fig.update_layout(
+            title={
+                'text': 'Ubicación Global de Indicadores Financieros',
+                'x': 0.5,
+                'xanchor': 'center'
+            },
+            geo=dict(
+                projection_type='natural earth',
+                showland=True,
+                landcolor='rgb(243, 243, 243)',
+                coastlinecolor='rgb(204, 204, 204)',
+                showocean=True,
+                oceancolor='rgb(230, 245, 255)',
+                showcountries=True,
+                countrycolor='rgb(204, 204, 204)'
             ),
-            name=indicator_data['indicator_name']
-        ))
-    
-    fig.update_layout(
-        title='Ubicación de Indicadores Financieros',
-        geo=dict(
-            projection_type='orthographic',
-            showland=True,
-            landcolor='rgb(243, 243, 243)',
-            coastlinecolor='rgb(204, 204, 204)',
-        ),
-        template='plotly_dark',
-        height=400
-    )
-    return fig
+            template='plotly_dark',
+            height=400,
+            showlegend=True
+        )
+        
+        return fig
+        
+    except Exception as e:
+        st.error(f"Error creando mapa: {e}")
+        # Return simple Altair chart as fallback
+        return alt.Chart(input_df).mark_circle(size=100).encode(
+            x='lon:Q',
+            y='lat:Q',
+            color='cerrar:Q',
+            tooltip=['indicator_name:N', 'cerrar:Q']
+        ).properties(width=700, height=400, title="Ubicaciones de Indicadores")
 
 def make_donut(input_response, input_text, input_color):
     if input_color == 'blue':
@@ -353,16 +377,32 @@ with col[0]:
 with col[1]:
     st.markdown('#### Mapa de Indicadores')
     
-    # World map showing indicator locations
-    world_map = make_world_map(all_indicators_data)
-    st.plotly_chart(world_map, use_container_width=True)
+    # World map showing indicator locations using Plotly
+    try:
+        all_indicators_data = df_with_location[df_with_location.year == selected_year]
+        if not all_indicators_data.empty:
+            world_map = make_world_map(all_indicators_data)
+            if isinstance(world_map, go.Figure):
+                st.plotly_chart(world_map, use_container_width=True)
+            else:
+                st.altair_chart(world_map, use_container_width=True)
+        else:
+            st.info("No hay datos disponibles para el año seleccionado")
+    except Exception as e:
+        st.error(f"Error mostrando mapa: {e}")
     
     st.markdown('#### Histórico por Año vs Indicador')
     
     # Heatmap: year vs indicator
-    heatmap_data = df_with_location.groupby(['year', 'indicator_name'])['cerrar'].mean().reset_index()
-    heatmap = make_heatmap(heatmap_data, 'year', 'indicator_name', 'cerrar')
-    st.altair_chart(heatmap, use_container_width=True)
+    try:
+        heatmap_data = df_with_location.groupby(['year', 'indicator_name'])['cerrar'].mean().reset_index()
+        if not heatmap_data.empty:
+            heatmap = make_heatmap(heatmap_data, 'year', 'indicator_name', 'cerrar')
+            st.altair_chart(heatmap, use_container_width=True)
+        else:
+            st.info("No hay suficientes datos para mostrar el heatmap")
+    except Exception as e:
+        st.error(f"Error creando heatmap: {e}")
 
 with col[2]:
     st.markdown('#### Top Indicadores')
@@ -401,24 +441,82 @@ with col[2]:
 if not df_selected.empty:
     st.markdown(f"### Datos detallados - {selected_indicator_display} ({selected_year})")
     
-    # Time series chart for selected indicator
-    fig_timeseries = px.line(
-        df_selected.sort_values('month'), 
-        x='month', 
-        y='cerrar',
-        title=f'Evolución mensual de {selected_indicator_display}',
-        labels={'cerrar': 'Precio de Cierre', 'month': 'Mes'}
-    )
-    fig_timeseries.update_layout(template='plotly_dark')
-    st.plotly_chart(fig_timeseries, use_container_width=True)
+    # Time series chart for selected indicator using Plotly
+    try:
+        df_timeseries = df_selected.sort_values('month').copy()
+        
+        # Create Plotly line chart
+        fig_timeseries = px.line(
+            df_timeseries, 
+            x='month', 
+            y='cerrar',
+            title=f'Evolución mensual de {selected_indicator_display}',
+            labels={'cerrar': 'Precio de Cierre', 'month': 'Mes'},
+            markers=True
+        )
+        
+        fig_timeseries.update_layout(
+            template='plotly_dark',
+            height=400,
+            title={
+                'x': 0.5,
+                'xanchor': 'center'
+            }
+        )
+        
+        fig_timeseries.update_traces(
+            line=dict(width=3),
+            marker=dict(size=8)
+        )
+        
+        st.plotly_chart(fig_timeseries, use_container_width=True)
+        
+    except Exception as e:
+        st.error(f"Error creando gráfico de series temporales: {e}")
+        # Fallback to Altair if Plotly fails
+        try:
+            df_timeseries = df_selected.sort_values('month').copy()
+            
+            timeseries_chart = alt.Chart(df_timeseries).mark_line(
+                color='#1f77b4',
+                strokeWidth=3
+            ).encode(
+                x=alt.X('month:O', title='Mes'),
+                y=alt.Y('cerrar:Q', title='Precio de Cierre'),
+                tooltip=['month:O', 'cerrar:Q']
+            ).properties(
+                width=800,
+                height=300,
+                title=f'Evolución mensual de {selected_indicator_display}'
+            )
+            
+            points = alt.Chart(df_timeseries).mark_circle(
+                color='#ff7f0e',
+                size=60
+            ).encode(
+                x='month:O',
+                y='cerrar:Q',
+                tooltip=['month:O', 'cerrar:Q']
+            )
+            
+            combined_chart = timeseries_chart + points
+            st.altair_chart(combined_chart, use_container_width=True)
+        except Exception as e2:
+            st.error(f"Error en fallback de Altair: {e2}")
     
     # Summary statistics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Promedio", f"{df_selected['cerrar'].mean():.2f}")
-    with col2:
-        st.metric("Máximo", f"{df_selected['cerrar'].max():.2f}")
-    with col3:
-        st.metric("Mínimo", f"{df_selected['cerrar'].min():.2f}")
-    with col4:
-        st.metric("Volatilidad", f"{df_selected['cerrar'].std():.2f}")
+    try:
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Promedio", f"{df_selected['cerrar'].mean():.2f}")
+        with col2:
+            st.metric("Máximo", f"{df_selected['cerrar'].max():.2f}")
+        with col3:
+            st.metric("Mínimo", f"{df_selected['cerrar'].min():.2f}")
+        with col4:
+            volatilidad = df_selected['cerrar'].std()
+            st.metric("Volatilidad", f"{volatilidad:.2f}" if pd.notna(volatilidad) else "N/A")
+    except Exception as e:
+        st.error(f"Error calculando estadísticas: {e}")
+else:
+    st.info(f"No hay datos disponibles para {selected_indicator_display} en {selected_year}")
