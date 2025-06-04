@@ -3,8 +3,15 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-import plotly.express as px
-import plotly.graph_objects as go
+
+# Try to import plotly, but fallback gracefully if not available
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    st.info("📊 Plotly no disponible - usando Altair para todas las visualizaciones")
 
 #######################
 # Page configuration
@@ -13,6 +20,22 @@ st.set_page_config(
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded")
+
+# Mostrar información de diagnóstico al inicio
+st.title("📈 Dashboard de Indicadores Financieros")
+
+# Verificar si el archivo existe antes de cargarlo
+import os
+file_path = 'src/edu_pad/static/csv/yahoo_finance_hist.csv'
+if not os.path.exists(file_path):
+    st.error(f"❌ Archivo no encontrado: {file_path}")
+    st.info("📋 Para generar el archivo, ejecuta: `python src/edu_pad/main_extractor.py`")
+    st.info("🔧 O usa el botón de abajo para crear datos de muestra")
+    
+    if st.button("🔧 Crear archivo de muestra para pruebas"):
+        create_sample_data()
+        st.rerun()
+    st.stop()
 
 alt.themes.enable("dark")
 
@@ -73,29 +96,90 @@ def load_data():
         df = pd.read_csv('src/edu_pad/static/csv/yahoo_finance_hist.csv')
         return df
     except FileNotFoundError:
-        st.error("No se encontró el archivo de datos. Ejecuta main_extractor.py primero.")
+        st.error("❌ No se encontró el archivo de datos: 'src/edu_pad/static/csv/yahoo_finance_hist.csv'")
+        st.info("📋 Ejecuta primero: `python src/edu_pad/main_extractor.py`")
+        
+        # Opción para crear archivo de muestra
+        if st.button("🔧 Crear archivo de muestra para pruebas"):
+            create_sample_data()
+            st.rerun()
+        
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"❌ Error cargando el archivo: {e}")
         return pd.DataFrame()
 
-# Función para verificar y validar columnas de ubicación
-def validate_location_columns(df):
-    """Verifica que el DataFrame tenga todas las columnas de ubicación necesarias"""
-    required_columns = ['indicator_name', 'country', 'lat', 'lon', 'region', 'currency_pair']
+def create_sample_data():
+    """Crea un archivo CSV de muestra para pruebas"""
+    import os
+    
+    # Crear directorio si no existe
+    os.makedirs('static/csv', exist_ok=True)
+    
+    # Datos de muestra
+    sample_data = {
+        'fecha': ['2024-01-01', '2024-02-01', '2024-03-01', '2024-01-01', '2024-02-01', '2024-03-01'],
+        'abrir': [4000.0, 4100.0, 4200.0, 1.08, 1.09, 1.10],
+        'max': [4050.0, 4150.0, 4250.0, 1.09, 1.10, 1.11],
+        'min': [3950.0, 4050.0, 4150.0, 1.07, 1.08, 1.09],
+        'cerrar': [4020.0, 4120.0, 4220.0, 1.085, 1.095, 1.105],
+        'cierre_ajustado': [4020.0, 4120.0, 4220.0, 1.085, 1.095, 1.105],
+        'volumen': [1000000, 1100000, 1200000, 50000, 55000, 60000],
+        'indicador': ['DOLA-USD', 'DOLA-USD', 'DOLA-USD', 'EURUSD%3DX', 'EURUSD%3DX', 'EURUSD%3DX'],
+        'year': [2024, 2024, 2024, 2024, 2024, 2024],
+        'month': [1, 2, 3, 1, 2, 3],
+        'day': [1, 1, 1, 1, 1, 1],
+        'year_month': ['2024-01', '2024-02', '2024-03', '2024-01', '2024-02', '2024-03'],
+        'indicator_name': ['Dólar/Peso', 'Dólar/Peso', 'Dólar/Peso', 'Euro/Dólar', 'Euro/Dólar', 'Euro/Dólar'],
+        'country': ['Colombia', 'Colombia', 'Colombia', 'Europa', 'Europa', 'Europa'],
+        'lat': [4.7110, 4.7110, 4.7110, 50.1109, 50.1109, 50.1109],
+        'lon': [-74.0721, -74.0721, -74.0721, 8.6821, 8.6821, 8.6821],
+        'region': ['América del Sur', 'América del Sur', 'América del Sur', 'Europa', 'Europa', 'Europa'],
+        'currency_pair': ['COP/USD', 'COP/USD', 'COP/USD', 'EUR/USD', 'EUR/USD', 'EUR/USD']
+    }
+    
+    df_sample = pd.DataFrame(sample_data)
+    df_sample.to_csv('src/edu_pad/static/csv/yahoo_finance_hist.csv', index=False)
+    
+    st.success("✅ Archivo de muestra creado exitosamente")
+    st.info("🔄 Recarga la página para usar los datos de muestra")
+
+def diagnose_dataframe(df):
+    """Diagnóstica el DataFrame para identificar problemas"""
+    if df.empty:
+        st.error("🔍 El DataFrame está vacío")
+        return False
+    
+    st.success(f"✅ Archivo cargado exitosamente: {len(df)} registros")
+    
+    # Mostrar información del DataFrame
+    with st.expander("🔍 Información del archivo CSV", expanded=False):
+        st.write("**Columnas encontradas:**")
+        st.write(list(df.columns))
+        st.write(f"**Número de filas:** {len(df)}")
+        st.write(f"**Número de columnas:** {len(df.columns)}")
+        
+        if len(df) > 0:
+            st.write("**Primeras 3 filas:**")
+            st.dataframe(df.head(3))
+    
+    # Verificar columnas requeridas
+    required_columns = ['indicador', 'year', 'cerrar']
     missing_columns = [col for col in required_columns if col not in df.columns]
     
     if missing_columns:
-        st.error(f"Faltan columnas en el archivo: {missing_columns}")
-        st.info("Ejecuta main_extractor.py para regenerar el archivo con todas las columnas.")
+        st.error(f"❌ Faltan columnas requeridas: {missing_columns}")
+        st.info("💡 Regenera el archivo ejecutando: `python src/edu_pad/main_extractor.py`")
         return False
+    
     return True
 
 #######################
 # Load data
 df_raw = load_data()
-if df_raw.empty:
-    st.stop()
 
-# Validar que el archivo tenga las columnas de ubicación
-if not validate_location_columns(df_raw):
+# Diagnósticar el DataFrame
+if not diagnose_dataframe(df_raw):
     st.stop()
 
 # Use data directly (location info already included from DataWeb)
@@ -121,18 +205,43 @@ if 'lat' in df_with_location.columns:
 if 'lon' in df_with_location.columns:
     df_with_location['lon'] = pd.to_numeric(df_with_location['lon'], errors='coerce')
 
+# Verificar que las columnas de ubicación existen, si no, crear valores por defecto
+required_location_columns = ['indicator_name', 'country', 'lat', 'lon', 'region', 'currency_pair']
+for col in required_location_columns:
+    if col not in df_with_location.columns:
+        st.warning(f"⚠️ Columna '{col}' no encontrada, usando valores por defecto")
+        if col == 'indicator_name':
+            df_with_location[col] = df_with_location.get('indicador', 'Unknown')
+        elif col in ['country', 'region', 'currency_pair']:
+            df_with_location[col] = 'Unknown'
+        elif col in ['lat', 'lon']:
+            df_with_location[col] = 0.0
+
 #######################
 # Sidebar
 with st.sidebar:
     st.title('📈 Financial Indicators Dashboard')
     
+    # Verificar que la columna indicador existe
+    if 'indicador' not in df_with_location.columns:
+        st.error("❌ Columna 'indicador' no encontrada en el archivo")
+        st.info("💡 Regenera el archivo ejecutando: `python src/edu_pad/main_extractor.py`")
+        st.stop()
+    
     # Selector de indicador (reemplaza color theme)
     indicator_list = list(df_with_location['indicador'].unique())
+    
+    if not indicator_list:
+        st.error("❌ No se encontraron indicadores en el archivo")
+        st.stop()
     
     # Crear diccionario de nombres amigables directamente del CSV
     indicator_names = {}
     for indicador in indicator_list:
-        nombre_amigable = df_with_location[df_with_location['indicador'] == indicador]['indicator_name'].iloc[0]
+        if 'indicator_name' in df_with_location.columns:
+            nombre_amigable = df_with_location[df_with_location['indicador'] == indicador]['indicator_name'].iloc[0]
+        else:
+            nombre_amigable = indicador  # Usar el código como nombre si no existe indicator_name
         indicator_names[indicador] = nombre_amigable
     
     selected_indicator_display = st.selectbox(
@@ -144,7 +253,17 @@ with st.sidebar:
     selected_indicator = next(ind for ind, name in indicator_names.items() 
                             if name == selected_indicator_display)
     
+    # Verificar que la columna year existe
+    if 'year' not in df_with_location.columns:
+        st.error("❌ Columna 'year' no encontrada en el archivo")
+        st.stop()
+    
     year_list = sorted([year for year in df_with_location.year.unique() if pd.notna(year)], reverse=True)
+    
+    if not year_list:
+        st.error("❌ No se encontraron años válidos en el archivo")
+        st.stop()
+        
     selected_year = st.selectbox('Selecciona un año', year_list)
     
     # Filter data
@@ -173,58 +292,84 @@ def make_heatmap(input_df, input_y, input_x, input_color):
     return heatmap
 
 def make_world_map(input_df):
-    """Crea un mapa mundial con los indicadores usando Plotly"""
+    """Crea un mapa mundial con los indicadores"""
     try:
         # Prepare data for world map
         map_data = input_df.groupby(['indicador', 'indicator_name', 'country', 'lat', 'lon'])['cerrar'].mean().reset_index()
         
-        fig = go.Figure()
-        
-        # Add points for each indicator
-        for _, row in map_data.iterrows():
-            fig.add_trace(go.Scattergeo(
-                lon=[row['lon']],
-                lat=[row['lat']],
-                text=f"{row['indicator_name']}<br>País: {row['country']}<br>Valor: {row['cerrar']:.2f}",
-                mode='markers+text',
-                marker=dict(
-                    size=15,
-                    color=row['cerrar'],
-                    colorscale='Viridis',
-                    showscale=True,
-                    colorbar=dict(title="Valor de Cierre"),
-                    line=dict(width=1, color='white')
+        if PLOTLY_AVAILABLE:
+            # Use Plotly if available
+            fig = go.Figure()
+            
+            # Add points for each indicator
+            for _, row in map_data.iterrows():
+                fig.add_trace(go.Scattergeo(
+                    lon=[row['lon']],
+                    lat=[row['lat']],
+                    text=f"{row['indicator_name']}<br>País: {row['country']}<br>Valor: {row['cerrar']:.2f}",
+                    mode='markers+text',
+                    marker=dict(
+                        size=15,
+                        color=row['cerrar'],
+                        colorscale='Viridis',
+                        showscale=True,
+                        colorbar=dict(title="Valor de Cierre"),
+                        line=dict(width=1, color='white')
+                    ),
+                    name=row['indicator_name'],
+                    textposition="top center"
+                ))
+            
+            fig.update_layout(
+                title={
+                    'text': 'Ubicación Global de Indicadores Financieros',
+                    'x': 0.5,
+                    'xanchor': 'center'
+                },
+                geo=dict(
+                    projection_type='natural earth',
+                    showland=True,
+                    landcolor='rgb(243, 243, 243)',
+                    coastlinecolor='rgb(204, 204, 204)',
+                    showocean=True,
+                    oceancolor='rgb(230, 245, 255)',
+                    showcountries=True,
+                    countrycolor='rgb(204, 204, 204)'
                 ),
-                name=row['indicator_name'],
-                textposition="top center"
-            ))
-        
-        fig.update_layout(
-            title={
-                'text': 'Ubicación Global de Indicadores Financieros',
-                'x': 0.5,
-                'xanchor': 'center'
-            },
-            geo=dict(
-                projection_type='natural earth',
-                showland=True,
-                landcolor='rgb(243, 243, 243)',
-                coastlinecolor='rgb(204, 204, 204)',
-                showocean=True,
-                oceancolor='rgb(230, 245, 255)',
-                showcountries=True,
-                countrycolor='rgb(204, 204, 204)'
-            ),
-            template='plotly_dark',
-            height=400,
-            showlegend=True
-        )
-        
-        return fig
+                template='plotly_dark',
+                height=400,
+                showlegend=True
+            )
+            
+            return fig
+        else:
+            # Use Altair as fallback
+            world_chart = alt.Chart(map_data).mark_circle(size=200).encode(
+                longitude='lon:Q',
+                latitude='lat:Q',
+                color=alt.Color('cerrar:Q', 
+                              scale=alt.Scale(scheme='viridis'),
+                              legend=alt.Legend(title="Valor de Cierre")),
+                size=alt.Size('cerrar:Q', 
+                             scale=alt.Scale(range=[100, 400]),
+                             legend=alt.Legend(title="Valor")),
+                tooltip=['indicator_name:N', 'country:N', 'cerrar:Q']
+            ).resolve_scale(
+                color='independent',
+                size='independent'
+            ).properties(
+                width=700,
+                height=400,
+                title="Ubicación de Indicadores Financieros"
+            ).project(
+                type='naturalEarth1'
+            )
+            
+            return world_chart
         
     except Exception as e:
         st.error(f"Error creando mapa: {e}")
-        # Return simple Altair chart as fallback
+        # Simple fallback chart
         return alt.Chart(input_df).mark_circle(size=100).encode(
             x='lon:Q',
             y='lat:Q',
@@ -377,12 +522,14 @@ with col[0]:
 with col[1]:
     st.markdown('#### Mapa de Indicadores')
     
-    # World map showing indicator locations using Plotly
+    # World map showing indicator locations
     try:
         all_indicators_data = df_with_location[df_with_location.year == selected_year]
         if not all_indicators_data.empty:
             world_map = make_world_map(all_indicators_data)
-            if isinstance(world_map, go.Figure):
+            
+            # Check if it's a Plotly figure or Altair chart
+            if PLOTLY_AVAILABLE and hasattr(world_map, 'update_layout'):
                 st.plotly_chart(world_map, use_container_width=True)
             else:
                 st.altair_chart(world_map, use_container_width=True)
@@ -441,68 +588,68 @@ with col[2]:
 if not df_selected.empty:
     st.markdown(f"### Datos detallados - {selected_indicator_display} ({selected_year})")
     
-    # Time series chart for selected indicator using Plotly
+    # Time series chart for selected indicator
     try:
         df_timeseries = df_selected.sort_values('month').copy()
         
-        # Create Plotly line chart
-        fig_timeseries = px.line(
-            df_timeseries, 
-            x='month', 
-            y='cerrar',
-            title=f'Evolución mensual de {selected_indicator_display}',
-            labels={'cerrar': 'Precio de Cierre', 'month': 'Mes'},
-            markers=True
-        )
-        
-        fig_timeseries.update_layout(
-            template='plotly_dark',
-            height=400,
-            title={
-                'x': 0.5,
-                'xanchor': 'center'
-            }
-        )
-        
-        fig_timeseries.update_traces(
-            line=dict(width=3),
-            marker=dict(size=8)
-        )
-        
-        st.plotly_chart(fig_timeseries, use_container_width=True)
-        
-    except Exception as e:
-        st.error(f"Error creando gráfico de series temporales: {e}")
-        # Fallback to Altair if Plotly fails
-        try:
-            df_timeseries = df_selected.sort_values('month').copy()
+        if PLOTLY_AVAILABLE:
+            # Use Plotly if available
+            fig_timeseries = px.line(
+                df_timeseries, 
+                x='month', 
+                y='cerrar',
+                title=f'Evolución mensual de {selected_indicator_display}',
+                labels={'cerrar': 'Precio de Cierre', 'month': 'Mes'},
+                markers=True
+            )
             
-            timeseries_chart = alt.Chart(df_timeseries).mark_line(
+            fig_timeseries.update_layout(
+                template='plotly_dark',
+                height=400,
+                title={
+                    'x': 0.5,
+                    'xanchor': 'center'
+                }
+            )
+            
+            fig_timeseries.update_traces(
+                line=dict(width=3),
+                marker=dict(size=8)
+            )
+            
+            st.plotly_chart(fig_timeseries, use_container_width=True)
+        else:
+            # Use Altair as fallback
+            line_chart = alt.Chart(df_timeseries).mark_line(
                 color='#1f77b4',
                 strokeWidth=3
             ).encode(
                 x=alt.X('month:O', title='Mes'),
                 y=alt.Y('cerrar:Q', title='Precio de Cierre'),
                 tooltip=['month:O', 'cerrar:Q']
-            ).properties(
-                width=800,
-                height=300,
-                title=f'Evolución mensual de {selected_indicator_display}'
             )
             
             points = alt.Chart(df_timeseries).mark_circle(
                 color='#ff7f0e',
-                size=60
+                size=80
             ).encode(
                 x='month:O',
                 y='cerrar:Q',
                 tooltip=['month:O', 'cerrar:Q']
             )
             
-            combined_chart = timeseries_chart + points
+            combined_chart = (line_chart + points).properties(
+                width=800,
+                height=400,
+                title=f'Evolución mensual de {selected_indicator_display}'
+            ).resolve_scale(
+                color='independent'
+            )
+            
             st.altair_chart(combined_chart, use_container_width=True)
-        except Exception as e2:
-            st.error(f"Error en fallback de Altair: {e2}")
+        
+    except Exception as e:
+        st.error(f"Error creando gráfico de series temporales: {e}")
     
     # Summary statistics
     try:
